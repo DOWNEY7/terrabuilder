@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@terrabuilder/engine": ["../../packages/engine/src/index.ts"],
+      "@terrabuilder/schemas": ["../../packages/schemas/src/index.ts"],
+      "@terrabuilder/emitters": ["../../packages/emitters/src/index.ts"],
+      "@terrabuilder/security": ["../../packages/security/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

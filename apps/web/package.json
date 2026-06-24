@@ -1,0 +1,32 @@
+{
+  "name": "@terrabuilder/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@terrabuilder/emitters": "workspace:*",
+    "@terrabuilder/engine": "workspace:*",
+    "@terrabuilder/schemas": "workspace:*",
+    "@terrabuilder/security": "workspace:*",
+    "@xyflow/react": "^12.11.0",
+    "immer": "^10.2.0",
+    "lucide-react": "^0.446.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3"
+  }
+}
