@@ -1,10 +1,38 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
+build/
+out/
+
+# Turbo
 .turbo/
-*.local
-.env*
+
+# Environment files
+.env
+.env.*
 !.env.example
+
+# Editor & OS
 .DS_Store
 Thumbs.db
+*.local
+.vscode/settings.json
+.idea/
+
+# Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# Cache
 .cache/
+.parcel-cache/
