@@ -30,6 +30,32 @@ TerraBuilder is an open-source, browser-based tool that lets you **visually desi
 
 ---
 
+## 📸 Screenshots
+
+### Real-Time Stock Market Pipeline (AWS)
+> **10 Resources · 6 Connections · $44.00/mo estimated · 🟢 100/100 Security Score**  
+> AWS Lambda processing, S3 raw data lake, DynamoDB tables, CloudWatch monitoring — all auto-wired with topological dependency resolution. Terraform HCL generated instantly with provider blocks, resource references, and tags.
+
+![TerraBuilder — Real-Time Stock Pipeline](docs/screenshots/screenshot-stock-pipeline.png)
+
+---
+
+### 3-Tier AWS Web Application
+> **5 Resources · 3 Connections · $39.90/mo estimated · 🟢 100/100 Security Score**  
+> Application Load Balancer → EC2 web server → RDS PostgreSQL database with S3 assets bucket and Security Group. All resources secured by default (encryption at rest, deletion protection, HTTPS enforcement). Output switches between Terraform HCL, CloudFormation, Azure Bicep, and Pulumi TS with one click.
+
+![TerraBuilder — 3-Tier AWS Web App](docs/screenshots/screenshot-3tier-webapp.png)
+
+---
+
+### GCP ML Pipeline (Multi-Service)
+> **5 Resources · 4 Connections · $22.50/mo estimated · 🟢 100/100 Security Score**  
+> Google Cloud Storage data lake → Cloud Functions data processor → Cloud Run ML API → BigQuery dataset — a complete ML inference pipeline visually designed in seconds. Live cost estimation and security scanning run on every canvas change.
+
+![TerraBuilder — GCP ML Pipeline](docs/screenshots/screenshot-gcp-ml-pipeline.png)
+
+---
+
 ## ✨ Features
 
 | Feature | Description |
