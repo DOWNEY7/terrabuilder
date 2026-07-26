@@ -8,6 +8,7 @@ const FORMAT_TABS = [
   { id: 'terraform' as const,      label: 'Terraform HCL', icon: '⬡' },
   { id: 'cloudformation' as const, label: 'CloudFormation', icon: '☁️' },
   { id: 'bicep' as const,          label: 'Azure Bicep', icon: '△' },
+  { id: 'pulumi' as const,         label: 'Pulumi TS', icon: '🟣' },
 ];
 
 export function CodePanel() {

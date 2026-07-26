@@ -4,3 +4,4 @@ export * from './resolver.js';
 export * from './validator.js';
 export * from './history.js';
 export * from './fieldValidator.js';
+export * from './costEstimator.js';

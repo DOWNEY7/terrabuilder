@@ -4,7 +4,7 @@
 // The canvas state is a TBCanvas.
 
 export type Provider = 'aws' | 'azure' | 'gcp';
-export type OutputFormat = 'terraform' | 'cloudformation' | 'bicep';
+export type OutputFormat = 'terraform' | 'cloudformation' | 'bicep' | 'pulumi';
 export type ExperienceMode = 'beginner' | 'intermediate' | 'advanced';
 export type CloudFilter = 'all' | Provider;
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';

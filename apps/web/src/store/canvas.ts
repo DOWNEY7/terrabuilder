@@ -9,9 +9,9 @@ import {
 import type {
   TBNode, TBEdge, TBCanvas, TBNodeData,
   ExperienceMode, CloudFilter, OutputFormat, SecurityReport,
-  CanvasTemplate,
+  CanvasTemplate, CanvasCostEstimate,
 } from '@terrabuilder/engine';
-import { HistoryManager } from '@terrabuilder/engine';
+import { HistoryManager, estimateCanvasCost } from '@terrabuilder/engine';
 import type { ResourceSchema } from '@terrabuilder/schemas';
 import {
   runSecurityEngine,
@@ -19,7 +19,7 @@ import {
   applyAllAutoFixes,
   applyCanvasAutoFixes,
 } from '@terrabuilder/security';
-import { emit } from '@terrabuilder/emitters';
+import { emit, generateProjectBundle } from '@terrabuilder/emitters';
 
 // ─── Canvas Store ─────────────────────────────────────────────────────────────
 
@@ -47,6 +47,7 @@ interface CanvasStore {
   showTemplates: boolean;
   graduationPrompt: boolean;
   securityReport: SecurityReport;
+  costEstimate: CanvasCostEstimate;
   canUndo: boolean;
   canRedo: boolean;
   generatedCode: string;
@@ -67,6 +68,7 @@ interface CanvasStore {
   redo:            () => void;
   loadTemplate:    (template: CanvasTemplate) => void;
   exportFile:      () => void;
+  exportZipBundle: () => void;
   importFile:      (json: string) => void;
   clearCanvas:     () => void;
   applyFix:        (nodeId: string, ruleId: string) => void;
@@ -85,6 +87,12 @@ const EMPTY_REPORT: SecurityReport = {
   mediumCount: 0,
   lowCount: 0,
   deployBlocked: false,
+};
+
+const EMPTY_COST: CanvasCostEstimate = {
+  totalMonthlyCost: 0,
+  currency: 'USD',
+  nodeCosts: [],
 };
 
 const INIT_META: TBCanvas['meta'] = {
@@ -124,11 +132,12 @@ function recompute(
   edges: TBEdge[],
   meta: TBCanvas['meta'],
   format: OutputFormat
-): { nodes: TBNode[]; securityReport: SecurityReport; generatedCode: string } {
+): { nodes: TBNode[]; securityReport: SecurityReport; generatedCode: string; costEstimate: CanvasCostEstimate } {
   const report = computeSecurity(nodes, edges, meta);
   const nodesWithSec = applySecurityToNodes(nodes, report);
   const code = computeCode(nodesWithSec, edges, meta, format);
-  return { nodes: nodesWithSec, securityReport: report, generatedCode: code };
+  const costEstimate = estimateCanvasCost(buildCanvas(nodesWithSec, edges, meta));
+  return { nodes: nodesWithSec, securityReport: report, generatedCode: code, costEstimate };
 }
 
 export const useCanvasStore = create<CanvasStore>()((set, get) => ({
@@ -144,9 +153,10 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
   showTemplates: false,
   graduationPrompt: false,
   securityReport: EMPTY_REPORT,
+  costEstimate: EMPTY_COST,
   canUndo: false,
   canRedo: false,
-  generatedCode: '# Add resources to the canvas to generate Terraform code.\n',
+  generatedCode: '# Add resources to the canvas to generate code.\n',
 
   addNode(schema, position) {
     const { nodes, edges, meta, mode, outputFormat } = get();
@@ -182,12 +192,12 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     };
 
     const newNodes = [...nodes, newNode];
-    const { nodes: updated, securityReport, generatedCode } = recompute(newNodes, edges, meta, outputFormat);
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(newNodes, edges, meta, outputFormat);
 
     const shouldGraduate = mode === 'beginner' && newNodes.length >= 6;
 
     set({
-      nodes: updated, securityReport, generatedCode,
+      nodes: updated, securityReport, generatedCode, costEstimate,
       canUndo: true, canRedo: false,
       graduationPrompt: shouldGraduate ? true : get().graduationPrompt,
     });
@@ -197,16 +207,16 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     const { nodes, edges, meta, outputFormat } = get();
     history.push({ nodes, edges, timestamp: Date.now() });
     const newNodes = nodes.map(n => n.id === id ? { ...n, data: { ...n.data, config } } : n);
-    const { nodes: updated, securityReport, generatedCode } = recompute(newNodes, edges, meta, outputFormat);
-    set({ nodes: updated, securityReport, generatedCode, canUndo: true });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(newNodes, edges, meta, outputFormat);
+    set({ nodes: updated, securityReport, generatedCode, costEstimate, canUndo: true });
   },
 
   updateNodeName(id, name) {
     const { nodes, edges, meta, outputFormat } = get();
     history.push({ nodes, edges, timestamp: Date.now() });
     const newNodes = nodes.map(n => n.id === id ? { ...n, data: { ...n.data, displayName: name } } : n);
-    const { nodes: updated, securityReport, generatedCode } = recompute(newNodes, edges, meta, outputFormat);
-    set({ nodes: updated, securityReport, generatedCode, canUndo: true });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(newNodes, edges, meta, outputFormat);
+    set({ nodes: updated, securityReport, generatedCode, costEstimate, canUndo: true });
   },
 
   removeNode(id) {
@@ -214,8 +224,8 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     history.push({ nodes, edges, timestamp: Date.now() });
     const newNodes = nodes.filter(n => n.id !== id);
     const newEdges = edges.filter(e => e.source !== id && e.target !== id);
-    const { nodes: updated, securityReport, generatedCode } = recompute(newNodes, newEdges, meta, outputFormat);
-    set({ nodes: updated, edges: newEdges, securityReport, generatedCode, selectedNodeId: null, canUndo: true });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(newNodes, newEdges, meta, outputFormat);
+    set({ nodes: updated, edges: newEdges, securityReport, generatedCode, costEstimate, selectedNodeId: null, canUndo: true });
   },
 
   onConnect(connection: Connection) {
@@ -231,8 +241,8 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
       animated: true,
     };
     const newEdges = [...edges, newEdge];
-    const { nodes: updated, securityReport, generatedCode } = recompute(nodes, newEdges, meta, outputFormat);
-    set({ nodes: updated, edges: newEdges, securityReport, generatedCode, canUndo: true });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(nodes, newEdges, meta, outputFormat);
+    set({ nodes: updated, edges: newEdges, securityReport, generatedCode, costEstimate, canUndo: true });
   },
 
   onNodesPositionChange(updatedNodes) {
@@ -245,7 +255,8 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
 
   setOutputFormat(format) {
     const { nodes, edges, meta } = get();
-    set({ outputFormat: format, generatedCode: computeCode(nodes, edges, meta, format) });
+    const code = computeCode(nodes, edges, meta, format);
+    set({ outputFormat: format, generatedCode: code });
   },
 
   setBottomTab: (tab) => set({ bottomTab: tab, bottomOpen: true }),
@@ -257,24 +268,24 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     const { nodes, edges, meta, outputFormat } = get();
     const prev = history.undo({ nodes, edges, timestamp: Date.now() });
     if (!prev) return;
-    const { nodes: updated, securityReport, generatedCode } = recompute(prev.nodes, prev.edges, meta, outputFormat);
-    set({ nodes: updated, edges: prev.edges, securityReport, generatedCode, canUndo: history.canUndo, canRedo: history.canRedo });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(prev.nodes, prev.edges, meta, outputFormat);
+    set({ nodes: updated, edges: prev.edges, securityReport, generatedCode, costEstimate, canUndo: history.canUndo, canRedo: history.canRedo });
   },
 
   redo() {
     const { nodes, edges, meta, outputFormat } = get();
     const next = history.redo({ nodes, edges, timestamp: Date.now() });
     if (!next) return;
-    const { nodes: updated, securityReport, generatedCode } = recompute(next.nodes, next.edges, meta, outputFormat);
-    set({ nodes: updated, edges: next.edges, securityReport, generatedCode, canUndo: history.canUndo, canRedo: history.canRedo });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(next.nodes, next.edges, meta, outputFormat);
+    set({ nodes: updated, edges: next.edges, securityReport, generatedCode, costEstimate, canUndo: history.canUndo, canRedo: history.canRedo });
   },
 
   loadTemplate(template) {
     history.push({ nodes: get().nodes, edges: get().edges, timestamp: Date.now() });
     const { nodes, edges } = template.canvas;
     const meta = { ...INIT_META, name: template.name, updatedAt: new Date().toISOString() };
-    const { nodes: updated, securityReport, generatedCode } = recompute(nodes, edges, meta, get().outputFormat);
-    set({ nodes: updated, edges, meta, securityReport, generatedCode, showTemplates: false, selectedNodeId: null, canUndo: true });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(nodes, edges, meta, get().outputFormat);
+    set({ nodes: updated, edges, meta, securityReport, generatedCode, costEstimate, showTemplates: false, selectedNodeId: null, canUndo: true });
   },
 
   exportFile() {
@@ -289,12 +300,34 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     URL.revokeObjectURL(url);
   },
 
+  exportZipBundle() {
+    const { nodes, edges, meta, outputFormat } = get();
+    const canvas: TBCanvas = { nodes, edges, meta: { ...meta, updatedAt: new Date().toISOString() } };
+    const files = generateProjectBundle(canvas, outputFormat);
+
+    // Download manifest JSON bundle or individual files
+    const manifest = {
+      projectName: meta.name,
+      format: outputFormat,
+      generatedAt: new Date().toISOString(),
+      files,
+    };
+
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${meta.name.replace(/\s+/g, '-').toLowerCase()}-bundle.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   importFile(json) {
     try {
       const canvas = JSON.parse(json) as TBCanvas;
       history.push({ nodes: get().nodes, edges: get().edges, timestamp: Date.now() });
-      const { nodes: updated, securityReport, generatedCode } = recompute(canvas.nodes, canvas.edges, canvas.meta, get().outputFormat);
-      set({ nodes: updated, edges: canvas.edges, meta: canvas.meta, securityReport, generatedCode, selectedNodeId: null, canUndo: true });
+      const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(canvas.nodes, canvas.edges, canvas.meta, get().outputFormat);
+      set({ nodes: updated, edges: canvas.edges, meta: canvas.meta, securityReport, generatedCode, costEstimate, selectedNodeId: null, canUndo: true });
     } catch (e) {
       console.error('Failed to import .tbp file:', e);
     }
@@ -306,7 +339,8 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     set({
       nodes: [], edges: [], meta,
       securityReport: EMPTY_REPORT,
-      generatedCode: '# Add resources to the canvas to generate Terraform code.\n',
+      costEstimate: EMPTY_COST,
+      generatedCode: '# Add resources to the canvas to generate code.\n',
       selectedNodeId: null,
       canUndo: true,
     });
@@ -336,7 +370,7 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
     for (const [nodeId, config] of fixes) {
       newNodes = newNodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, config } } : n);
     }
-    const { nodes: updated, securityReport, generatedCode } = recompute(newNodes, edges, meta, outputFormat);
-    set({ nodes: updated, securityReport, generatedCode });
+    const { nodes: updated, securityReport, generatedCode, costEstimate } = recompute(newNodes, edges, meta, outputFormat);
+    set({ nodes: updated, securityReport, generatedCode, costEstimate });
   },
 }));
